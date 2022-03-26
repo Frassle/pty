@@ -2,7 +2,6 @@ package pty
 
 import (
 	"io"
-	"regexp"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -57,8 +56,9 @@ func TestName(t *testing.T) {
 	pty, tty, err := Open()
 	assert.NoError(t, err)
 
-	assert.Equal(t, "/dev/ptmx", pty.Name())
-	assert.Regexp(t, regexp.MustCompile(`/dev/pts/\d+`), tty.Name())
+	// Check name isn't empty. There's variation on what exactly the OS calls these files.
+	assert.NotEqual(t, "", pty.Name())
+	assert.Regexp(t, "", tty.Name())
 
 	err = tty.Close()
 	assert.NoError(t, err)
