@@ -9,19 +9,15 @@ on:
     - master
 
 jobs:
-  lint:
-    runs-on: ubuntu-latest
-
-    steps:
-    - name: Set up Go 1.17.x
-      uses: actions/setup-go@v2
-      with:
-        go-version: 1.17.x
-        check-latest: true
-    - name: Checkout repo
-      uses: actions/checkout@v2
-    - name: Lint
-      run: golangci-lint run -c .golangci.yml
+  #lint:
+  #  runs-on: ubuntu-latest
+  #  container: golangci/golangci-lint:v1.44
+  #
+  #  steps:
+  #  - name: Checkout repo
+  #    uses: actions/checkout@v2
+  #  - name: Lint
+  #    run: golangci-lint run -c .golangci.yml
 
 
   crosscompile:
@@ -46,9 +42,9 @@ jobs:
     strategy:
         matrix:
           platform:
-            - macos-latest
             - ubuntu-latest
-            - windows-latest
+            #- macos-latest
+            #- windows-latest
 
     steps:
     - name: Set up Go 1.17.x
