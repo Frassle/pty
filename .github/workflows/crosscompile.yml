@@ -6,7 +6,8 @@ on:
     - master
 
 jobs:
-  crosscompile:
+  test:
+    name: Run ./test_crosscompile.sh
     runs-on: ubuntu-latest
 
     steps:
@@ -17,5 +18,5 @@ jobs:
         check-latest: true
     - name: Checkout repo
       uses: actions/checkout@v2
-    - name: Run test_crosscompile
+    - name: Run ./test_crosscompile.sh
       run: ./test_crosscompile.sh
