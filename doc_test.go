@@ -3,6 +3,7 @@ package pty
 import (
 	"bytes"
 	"io"
+	"os/exec"
 	"testing"
 )
 
@@ -327,6 +328,93 @@ func TestReadWriteControls(t *testing.T) {
 	if err != nil {
 		t.Errorf("Unexpected error from tty Close: %s", err)
 	}
+
+	err = pty.Close()
+	if err != nil {
+		t.Errorf("Unexpected error from pty Close: %s", err)
+	}
+}
+
+// Copy of io.ReadAll because 1.6 doesn't support it
+func readAll(r io.Reader) ([]byte, error) {
+	b := make([]byte, 0, 512)
+	for {
+		if len(b) == cap(b) {
+			// Add more capacity (let append pick how much).
+			b = append(b, 0)[:len(b)]
+		}
+		n, err := r.Read(b[len(b):cap(b)])
+		b = b[:len(b)+n]
+		if err != nil {
+			if err == io.EOF {
+				err = nil
+			}
+			return b, err
+		}
+	}
+}
+
+func TestEcho(t *testing.T) {
+	t.Parallel()
+
+	// Test that we can start echo with a tty and read back all the data
+	text := "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. " +
+		"Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. " +
+		"Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. " +
+		"Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum."
+	cmd := exec.Command("echo", text)
+
+	pty, err := Start(cmd)
+	if err != nil {
+		t.Errorf("Unexpected error from Start: %s", err)
+	}
+
+	expected := []byte(text + "\r\n")
+	data, _ := readAll(pty)
+	if !bytes.Equal(expected, data) {
+		t.Errorf("Unexpected result returned from Read, got %v expected %v", data, expected)
+	}
+
+	err = cmd.Wait()
+	if err != nil {
+		t.Errorf("Unexpected error from cmd Wait: %s", err)
+	}
+}
+
+func TestAsyncReadWrite(t *testing.T) {
+	t.Parallel()
+
+	text := []byte("Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.\n" +
+		"Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat.\n" +
+		"Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur.\n" +
+		"Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.\n")
+
+	pty, tty, err := Open()
+	if err != nil {
+		t.Errorf("Unexpected error from Open: %s", err)
+	}
+
+	// Try to read from PTY asynchronously
+	buffer := &bytes.Buffer{}
+	done := make(chan bool)
+	go func() {
+		n, _ := io.Copy(buffer, pty)
+		if n != 450 { // 450 = len(text) + \r for each \n
+			t.Errorf("Unexpected count returned from Write, got %d expected %d", n, len(text))
+		}
+		close(done)
+	}()
+
+	// Write to tty, in chunks
+	io.CopyBuffer(tty, bytes.NewBuffer(text), make([]byte, 8))
+	// Close tty
+	err = tty.Close()
+	if err != nil {
+		t.Errorf("Unexpected error from tty Close: %s", err)
+	}
+
+	// Wait for done
+	<-done
 
 	err = pty.Close()
 	if err != nil {
